@@ -32,13 +32,13 @@ app.get("/api", async (req, res) => {
     {
       status: 200,
       message: "Search results found",
-      data: { 
+      data: {
         results: [
           { id: 1, name: "Product A", price: 29.99 },
-          { id: 2, name: "Product B", price: 49.99 }
-        ], 
+          { id: 2, name: "Product B", price: 49.99 },
+        ],
         total: 2,
-        delay: `${delay}ms` 
+        delay: `${delay}ms`,
       },
     },
     {
@@ -49,19 +49,19 @@ app.get("/api", async (req, res) => {
     {
       status: 201,
       message: "User account created",
-      data: { 
+      data: {
         userId: Math.floor(Math.random() * 10000),
         username: `user_${Math.floor(Math.random() * 1000)}`,
-        delay: `${delay}ms` 
+        delay: `${delay}ms`,
       },
     },
     {
       status: 202,
       message: "Request accepted for processing",
-      data: { 
+      data: {
         jobId: Math.random().toString(36).substring(2, 15),
         status: "queued",
-        delay: `${delay}ms` 
+        delay: `${delay}ms`,
       },
     },
     {
@@ -71,10 +71,10 @@ app.get("/api", async (req, res) => {
     {
       status: 206,
       message: "Partial content delivered",
-      data: { 
+      data: {
         range: "bytes 0-1023/2048",
         contentLength: 1024,
-        delay: `${delay}ms` 
+        delay: `${delay}ms`,
       },
     },
 
@@ -118,7 +118,7 @@ app.get("/api", async (req, res) => {
     },
     {
       status: 400,
-      error: "Bad Request", 
+      error: "Bad Request",
       message: "Invalid JSON format",
       details: "Malformed JSON in request body",
     },
@@ -162,7 +162,9 @@ app.get("/api", async (req, res) => {
       status: 404,
       error: "Not Found",
       message: "User not found",
-      details: `User with ID ${Math.floor(Math.random() * 1000)} does not exist`,
+      details: `User with ID ${Math.floor(
+        Math.random() * 1000
+      )} does not exist`,
     },
     {
       status: 405,
@@ -390,12 +392,52 @@ app.get("/api", async (req, res) => {
     },
   ];
 
-  // Weight the scenarios (success: 60%, client errors: 25%, server errors: 15%)
+  // Weight the scenarios to maintain realistic distribution
+  // 2xx: Success responses (60% chance)
+  const successScenarios = scenarios.filter(
+    (s) => s.status >= 200 && s.status < 300
+  );
+  // 3xx: Redirection responses (5% chance)
+  const redirectScenarios = scenarios.filter(
+    (s) => s.status >= 300 && s.status < 400
+  );
+  // 4xx: Client error responses (25% chance)
+  const clientErrorScenarios = scenarios.filter(
+    (s) => s.status >= 400 && s.status < 500
+  );
+  // 5xx: Server error responses (10% chance)
+  const serverErrorScenarios = scenarios.filter(
+    (s) => s.status >= 500 && s.status < 600
+  );
+
   const weightedScenarios = [
-    ...scenarios.slice(0, 3),
-    ...scenarios.slice(0, 3),
-    ...scenarios.slice(3, 8),
-    ...scenarios.slice(8, 12),
+    // Success responses - 60% (12 entries)
+    ...Array(12)
+      .fill()
+      .flatMap(
+        () =>
+          successScenarios[Math.floor(Math.random() * successScenarios.length)]
+      ),
+    // Redirection responses - 5% (1 entry)
+    redirectScenarios[Math.floor(Math.random() * redirectScenarios.length)],
+    // Client errors - 25% (5 entries)
+    ...Array(5)
+      .fill()
+      .flatMap(
+        () =>
+          clientErrorScenarios[
+            Math.floor(Math.random() * clientErrorScenarios.length)
+          ]
+      ),
+    // Server errors - 10% (2 entries)
+    ...Array(2)
+      .fill()
+      .flatMap(
+        () =>
+          serverErrorScenarios[
+            Math.floor(Math.random() * serverErrorScenarios.length)
+          ]
+      ),
   ];
 
   // Select random scenario
