@@ -1,57 +1,7 @@
 import express from "express";
-import promClient from "prom-client";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-
-// Prometheus metrics setup
-const register = new promClient.Registry();
-
-// Add default metrics (CPU, memory, etc.)
-promClient.collectDefaultMetrics({ register });
-
-// Custom metrics
-const httpRequestDuration = new promClient.Histogram({
-  name: "http_request_duration_seconds",
-  help: "Duration of HTTP requests in seconds",
-  labelNames: ["method", "route", "status_code"],
-  buckets: [0.1, 0.3, 0.5, 0.7, 1, 3, 5, 7, 10],
-});
-
-const httpRequestTotal = new promClient.Counter({
-  name: "http_requests_total",
-  help: "Total number of HTTP requests",
-  labelNames: ["method", "route", "status_code"],
-});
-
-const apiResponseDelay = new promClient.Histogram({
-  name: "api_response_delay_seconds",
-  help: "Artificial delay added to API responses",
-  buckets: [0.1, 0.5, 1, 2, 3, 5],
-});
-
-// Register custom metrics
-register.registerMetric(httpRequestDuration);
-register.registerMetric(httpRequestTotal);
-register.registerMetric(apiResponseDelay);
-
-// Middleware to collect metrics
-app.use((req, res, next) => {
-  const start = Date.now();
-
-  res.on("finish", () => {
-    const duration = (Date.now() - start) / 1000;
-    const route = req.route ? req.route.path : req.path;
-
-    httpRequestDuration
-      .labels(req.method, route, res.statusCode)
-      .observe(duration);
-
-    httpRequestTotal.labels(req.method, route, res.statusCode).inc();
-  });
-
-  next();
-});
 
 app.use(express.json());
 
@@ -64,10 +14,6 @@ app.get("/", (req, res) => {
 app.get("/api", async (req, res) => {
   // Random delay between 100ms to 3000ms
   const delay = Math.floor(Math.random() * 2900) + 100;
-
-  // Record the artificial delay metric
-  apiResponseDelay.observe(delay / 1000);
-
   await new Promise((resolve) => setTimeout(resolve, delay));
 
   // Generate random response scenarios
@@ -522,16 +468,6 @@ app.get("/health", (req, res) => {
   });
 });
 
-// Prometheus metrics endpoint
-app.get("/metrics", async (req, res) => {
-  try {
-    res.set("Content-Type", register.contentType);
-    res.end(await register.metrics());
-  } catch (error) {
-    res.status(500).json({ error: "Failed to collect metrics" });
-  }
-});
-
 // 404 handler for undefined routes
 app.use((req, res) => {
   res.status(404).json({
@@ -557,7 +493,6 @@ app.listen(PORT, () => {
   console.log(`📍 Root endpoint: http://localhost:${PORT}/`);
   console.log(`🎲 API endpoint: http://localhost:${PORT}/api`);
   console.log(`❤️  Health check: http://localhost:${PORT}/health`);
-  console.log(`📊 Metrics endpoint: http://localhost:${PORT}/metrics`);
 });
 
 export default app;
