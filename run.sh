@@ -199,6 +199,17 @@ EOF
     # Clean up previous runs
     cleanup
     
+    # Create necessary directories with proper permissions
+    print_status "Creating necessary directories..."
+    mkdir -p ./data/loki/chunks ./data/loki/rules ./data/loki/tsdb-index ./data/loki/tsdb-cache ./data/loki/boltdb-shipper-compactor
+    mkdir -p ./data/tempo ./data/prometheus ./data/grafana
+    chmod -R 777 ./data/ 2>/dev/null || true
+    
+    print_status "Setting up Loki directories..."
+    # Ensure Loki has all required directories
+    sudo mkdir -p ./data/loki/chunks ./data/loki/rules ./data/loki/tsdb-index ./data/loki/tsdb-cache ./data/loki/boltdb-shipper-compactor 2>/dev/null || true
+    sudo chmod -R 777 ./data/loki/ 2>/dev/null || true
+    
     # Build and start services
     print_status "Building and starting all services..."
     if command -v docker-compose > /dev/null 2>&1; then
@@ -220,6 +231,20 @@ EOF
     wait_for_service "Tempo" "http://localhost:3200/ready"
     wait_for_service "Grafana" "http://localhost:3000/api/health"
     wait_for_service "Express Application" "http://localhost:8080/health"
+    
+    # Check for any failed containers
+    print_status "Checking for any failed containers..."
+    if command -v docker-compose > /dev/null 2>&1; then
+        failed_containers=$(docker-compose ps --services --filter "status=exited")
+    else
+        failed_containers=$(docker compose ps --services --filter "status=exited")
+    fi
+    
+    if [ ! -z "$failed_containers" ]; then
+        print_warning "Some containers have failed:"
+        echo "$failed_containers"
+        print_status "To troubleshoot, check logs with: docker-compose logs <service-name>"
+    fi
     
     # Show service information
     echo ""

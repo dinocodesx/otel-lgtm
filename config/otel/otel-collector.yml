@@ -27,9 +27,9 @@ processors:
     spike_limit_percentage: 30
 
 exporters:
-  # Logging exporter for debugging
-  logging:
-    loglevel: info
+  # Debug exporter for debugging
+  debug:
+    verbosity: detailed
 
   # Prometheus exporter for metrics
   prometheus:
@@ -38,23 +38,10 @@ exporters:
       environment: development
 
   # OTLP HTTP exporter for Tempo (traces)
-  otlp/tempo:
-    endpoint: http://tempo:3200
+  otlphttp/tempo:
+    endpoint: http://tempo:3200/v1/traces
     tls:
       insecure: true
-
-  # Loki exporter for logs
-  loki:
-    endpoint: http://loki:3100/loki/api/v1/push
-    tenant_id: ""
-    labels:
-      attributes:
-        service.name: "service_name"
-        service.namespace: "service_namespace"
-        level: "level"
-      resource:
-        service.name: "service_name"
-        service.namespace: "service_namespace"
 
 extensions:
   health_check:
@@ -70,20 +57,21 @@ service:
     traces:
       receivers: [otlp]
       processors: [memory_limiter, resource, batch]
-      exporters: [logging, otlp/tempo]
+      exporters: [debug, otlphttp/tempo]
 
     metrics:
       receivers: [otlp]
       processors: [memory_limiter, resource, batch]
-      exporters: [logging, prometheus]
+      exporters: [debug, prometheus]
 
+    # Logs pipeline temporarily disabled - using console logs for now
     logs:
       receivers: [otlp]
       processors: [memory_limiter, resource, batch]
-      exporters: [logging, loki]
+      exporters: [debug]
 
   telemetry:
     logs:
       level: "info"
     metrics:
-      address: 0.0.0.0:8888
+      level: detailed

@@ -54,7 +54,7 @@ services:
       - "9091:9090"
     volumes:
       - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-      - prometheus_data:/prometheus
+      - ./data/prometheus:/prometheus
     networks:
       - otel-lgtm
 
@@ -64,7 +64,7 @@ services:
     command: [ "-config.file=/etc/tempo.yaml" ]
     volumes:
       - ./config/tempo/tempo.yml:/etc/tempo.yaml
-      - tempo_data:/tmp/tempo
+      - ./data/tempo:/tmp/tempo
     ports:
       - "3200:3200"   # Tempo
       - "14268:14268" # Jaeger ingest
@@ -74,12 +74,14 @@ services:
   # Grafana Loki for Logs
   loki:
     image: grafana/loki:latest
-    command: -config.file=/etc/loki/local-config.yaml
-    volumes:
-      - ./config/loki/loki.yml:/etc/loki/local-config.yaml
-      - loki_data:/tmp/loki
+    user: "0:0"  # Run as root to handle permissions
     ports:
       - "3100:3100"
+    volumes:
+      - ./data/loki:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    environment:
+      - LOKI_CONFIG_FILE=/etc/loki/local-config.yaml
     networks:
       - otel-lgtm
 
@@ -94,19 +96,13 @@ services:
       - GF_USERS_ALLOW_SIGN_UP=false
     volumes:
       - ./config/grafana/provisioning:/etc/grafana/provisioning
-      - grafana_data:/var/lib/grafana
+      - ./data/grafana:/var/lib/grafana
     depends_on:
       - prometheus
       - tempo
       - loki
     networks:
       - otel-lgtm
-
-volumes:
-  prometheus_data:
-  grafana_data:
-  tempo_data:
-  loki_data:
 
 networks:
   otel-lgtm:
