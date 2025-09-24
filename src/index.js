@@ -1,9 +1,99 @@
+// Import OpenTelemetry instrumentation FIRST
+import "./instrumentation.js";
+
 import express from "express";
+import * as api from "@opentelemetry/api";
+import dotenv from "dotenv";
+import { loggingMiddleware, logger } from "./middleware/logging.js";
+
+// Load environment variables
+dotenv.config();
+
+// Get tracer and meter for custom telemetry
+const tracer = api.trace.getTracer("express-app", "1.0.0");
+const meter = api.metrics.getMeter("express-app", "1.0.0");
+
+// Create custom metrics
+const httpRequestsTotal = meter.createCounter("http_requests_total", {
+  description: "Total number of HTTP requests",
+});
+
+const httpRequestDuration = meter.createHistogram(
+  "http_request_duration_seconds",
+  {
+    description: "HTTP request duration in seconds",
+  }
+);
+
+const apiResponsesTotal = meter.createCounter("api_responses_total", {
+  description: "Total number of API responses by status code",
+});
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 
 app.use(express.json());
+
+// Use the enhanced logging middleware
+app.use(loggingMiddleware);
+
+// Custom middleware for request tracking and metrics
+app.use((req, res, next) => {
+  const startTime = Date.now();
+
+  // Create a span for this request
+  const span = tracer.startSpan(`${req.method} ${req.path}`, {
+    attributes: {
+      "http.method": req.method,
+      "http.url": req.url,
+      "http.path": req.path,
+      "http.user_agent": req.get("User-Agent") || "",
+      "http.remote_addr": req.ip,
+    },
+  });
+
+  // Add span to context
+  req.span = span;
+
+  // Override res.end to capture response metrics
+  const originalEnd = res.end;
+  res.end = function (...args) {
+    const endTime = Date.now();
+    const duration = (endTime - startTime) / 1000; // Convert to seconds
+
+    // Record metrics
+    httpRequestsTotal.add(1, {
+      method: req.method,
+      path: req.path,
+      status_code: res.statusCode.toString(),
+    });
+
+    httpRequestDuration.record(duration, {
+      method: req.method,
+      path: req.path,
+      status_code: res.statusCode.toString(),
+    });
+
+    // Update span with response data
+    span.setAttributes({
+      "http.status_code": res.statusCode,
+      "http.response_size": res.get("content-length") || 0,
+    });
+
+    // Set span status based on response code
+    if (res.statusCode >= 400) {
+      span.setStatus({
+        code: api.SpanStatusCode.ERROR,
+        message: `HTTP ${res.statusCode}`,
+      });
+    }
+
+    span.end();
+    originalEnd.apply(this, args);
+  };
+
+  next();
+});
 
 // Root route - showing "App is running"
 app.get("/", (req, res) => {
@@ -12,8 +102,18 @@ app.get("/", (req, res) => {
 
 // API route with delayed responses and various status codes
 app.get("/api", async (req, res) => {
+  const span = req.span || tracer.startSpan("api_endpoint");
+
   // Random delay between 100ms to 3000ms
   const delay = Math.floor(Math.random() * 2900) + 100;
+
+  // Add span attributes for the delay
+  span.setAttributes({
+    "api.delay_ms": delay,
+    "api.endpoint": "/api",
+  });
+
+  // Simulate async operation
   await new Promise((resolve) => setTimeout(resolve, delay));
 
   // Generate random response scenarios
@@ -444,12 +544,51 @@ app.get("/api", async (req, res) => {
   const randomScenario =
     weightedScenarios[Math.floor(Math.random() * weightedScenarios.length)];
 
-  // Log the response for debugging
-  console.log(
-    `[${new Date().toISOString()}] API Response: ${
-      randomScenario.status
-    } - Delay: ${delay}ms`
-  );
+  // Add telemetry data
+  span.setAttributes({
+    "api.response.status_code": randomScenario.status,
+    "api.response.delay_ms": delay,
+    "api.scenario.type":
+      randomScenario.status < 300
+        ? "success"
+        : randomScenario.status < 400
+        ? "redirect"
+        : randomScenario.status < 500
+        ? "client_error"
+        : "server_error",
+  });
+
+  // Record API-specific metrics
+  apiResponsesTotal.add(1, {
+    status_code: randomScenario.status.toString(),
+    endpoint: "/api",
+  });
+
+  // Log the response for debugging with structured logging
+  const logData = {
+    timestamp: new Date().toISOString(),
+    level:
+      randomScenario.status >= 500
+        ? "error"
+        : randomScenario.status >= 400
+        ? "warn"
+        : "info",
+    message: `API Response: ${randomScenario.status} - Delay: ${delay}ms`,
+    api: {
+      endpoint: "/api",
+      status_code: randomScenario.status,
+      delay_ms: delay,
+      response_type: randomScenario.message,
+    },
+    request: {
+      method: req.method,
+      path: req.path,
+      user_agent: req.get("User-Agent"),
+      remote_addr: req.ip,
+    },
+  };
+
+  console.log(JSON.stringify(logData));
 
   // Send the response
   res.status(randomScenario.status).json({

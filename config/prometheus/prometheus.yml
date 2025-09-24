@@ -1,0 +1,46 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+
+scrape_configs:
+  # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config.
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # Scrape the OpenTelemetry Collector
+  - job_name: "otel-collector"
+    static_configs:
+      - targets: ["otel-collector:8888", "otel-collector:8889"]
+    scrape_interval: 10s
+    metrics_path: /metrics
+
+  # Scrape the Express application Prometheus endpoint
+  - job_name: "express-app"
+    static_configs:
+      - targets: ["express-app:9090"]
+    scrape_interval: 5s
+    metrics_path: /metrics
+
+  # Scrape other components
+  - job_name: "grafana"
+    static_configs:
+      - targets: ["grafana:3000"]
+    scrape_interval: 30s
+    metrics_path: /metrics
+
+  - job_name: "loki"
+    static_configs:
+      - targets: ["loki:3100"]
+    scrape_interval: 15s
+    metrics_path: /metrics
+
+  - job_name: "tempo"
+    static_configs:
+      - targets: ["tempo:3200"]
+    scrape_interval: 15s
+    metrics_path: /metrics
