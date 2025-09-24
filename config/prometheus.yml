@@ -1,0 +1,58 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+
+scrape_configs:
+  # Prometheus itself
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+    scrape_interval: 30s
+    metrics_path: /metrics
+
+  # Go Application Metrics
+  - job_name: "go-api"
+    static_configs:
+      - targets: ["go-api:8080"]
+    scrape_interval: 15s
+    metrics_path: /metrics
+    scrape_timeout: 10s
+
+  # OpenTelemetry Collector Metrics
+  - job_name: "otel-collector"
+    static_configs:
+      - targets: ["otel-collector:8888"]
+    scrape_interval: 30s
+    metrics_path: /metrics
+
+  # Grafana Metrics (optional)
+  - job_name: "grafana"
+    static_configs:
+      - targets: ["grafana:3000"]
+    scrape_interval: 30s
+    metrics_path: /metrics
+
+  # Loki Metrics (optional)
+  - job_name: "loki"
+    static_configs:
+      - targets: ["loki:3100"]
+    scrape_interval: 30s
+    metrics_path: /metrics
+
+  # Tempo Metrics (optional)
+  - job_name: "tempo"
+    static_configs:
+      - targets: ["tempo:3200"]
+    scrape_interval: 30s
+    metrics_path: /metrics
+
+# Alerting configuration (optional)
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # - alertmanager:9093
