@@ -1,0 +1,14 @@
+# Ignore common files that shouldn't be in the image
+.git/
+.gitignore
+README.md
+LICENSE
+*.md
+.env*
+.vscode/
+.idea/
+*.log
+*.tmp
+*.swp
+*.swo
+*~
