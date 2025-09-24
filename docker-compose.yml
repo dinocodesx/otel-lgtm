@@ -8,7 +8,6 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8080:8080"
-      - "9090:9090"  # Prometheus metrics endpoint
     environment:
       - NODE_ENV=development
       - SERVICE_NAME=otel-lgtm-express-app
@@ -51,7 +50,7 @@ services:
       - --storage.tsdb.retention.time=200h
       - --web.enable-lifecycle
     ports:
-      - "9091:9090"
+      - "9090:9090"
     volumes:
       - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
       - ./data/prometheus:/prometheus

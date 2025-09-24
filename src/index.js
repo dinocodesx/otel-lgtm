@@ -61,7 +61,7 @@ app.use((req, res, next) => {
     const endTime = Date.now();
     const duration = (endTime - startTime) / 1000; // Convert to seconds
 
-    // Record metrics
+    // Record OpenTelemetry metrics
     httpRequestsTotal.add(1, {
       method: req.method,
       path: req.path,
@@ -558,7 +558,7 @@ app.get("/api", async (req, res) => {
         : "server_error",
   });
 
-  // Record API-specific metrics
+  // Record API-specific metrics (OpenTelemetry)
   apiResponsesTotal.add(1, {
     status_code: randomScenario.status.toString(),
     endpoint: "/api",

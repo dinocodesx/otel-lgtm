@@ -39,8 +39,12 @@ print_header() {
 
 # Function to check if Docker is running
 check_docker() {
-    if ! docker info > /dev/null 2>&1; then
-        print_error "Docker is not running. Please start Docker first."
+    print_status "Checking Docker daemon..."
+    if ! timeout 10 docker info > /dev/null 2>&1; then
+        print_error "Docker is not running or not responding. Please:"
+        print_error "1. Make sure Docker Desktop is running"
+        print_error "2. Check Docker daemon status: systemctl status docker"
+        print_error "3. Restart Docker if needed: sudo systemctl restart docker"
         exit 1
     fi
     print_success "Docker is running"
@@ -48,7 +52,8 @@ check_docker() {
 
 # Function to check if Docker Compose is available
 check_docker_compose() {
-    if ! command -v docker-compose > /dev/null 2>&1 && ! docker compose version > /dev/null 2>&1; then
+    print_status "Checking Docker Compose..."
+    if ! timeout 5 docker compose version > /dev/null 2>&1 && ! timeout 5 docker-compose --version > /dev/null 2>&1; then
         print_error "Docker Compose is not available. Please install Docker Compose."
         exit 1
     fi
@@ -59,15 +64,15 @@ check_docker_compose() {
 cleanup() {
     print_status "Cleaning up previous containers and volumes..."
     
-    # Stop and remove containers
-    if docker-compose ps -q > /dev/null 2>&1; then
-        docker-compose down -v --remove-orphans
-    elif docker compose ps -q > /dev/null 2>&1; then
-        docker compose down -v --remove-orphans
+    # Stop and remove containers with timeout
+    if timeout 30 docker compose ps -q > /dev/null 2>&1; then
+        timeout 60 docker compose down -v --remove-orphans || print_warning "Cleanup took longer than expected"
+    elif timeout 30 docker-compose ps -q > /dev/null 2>&1; then
+        timeout 60 docker-compose down -v --remove-orphans || print_warning "Cleanup took longer than expected"
     fi
     
     # Prune unused networks
-    docker network prune -f > /dev/null 2>&1 || true
+    timeout 10 docker network prune -f > /dev/null 2>&1 || true
     
     print_success "Cleanup completed"
 }
@@ -101,11 +106,11 @@ show_urls() {
     print_header "🌐 SERVICE URLS"
     echo -e "${CYAN}Express Application:${NC}     http://localhost:8080"
     echo -e "${CYAN}Grafana Dashboard:${NC}       http://localhost:3000 (admin/admin)"
-    echo -e "${CYAN}Prometheus:${NC}              http://localhost:9091"
+    echo -e "${CYAN}Prometheus:${NC}              http://localhost:9090"
     echo -e "${CYAN}OpenTelemetry Collector:${NC} http://localhost:8888/metrics"
     echo -e "${CYAN}Loki:${NC}                    http://localhost:3100"
     echo -e "${CYAN}Tempo:${NC}                   http://localhost:3200"
-    echo -e "${CYAN}App Metrics:${NC}             http://localhost:9090/metrics"
+    echo -e "${CYAN}App Metrics (Prometheus):${NC} http://localhost:8889/metrics"
     echo ""
     echo -e "${YELLOW}📊 In Grafana, you can:${NC}"
     echo -e "  • View application metrics from Prometheus"
@@ -206,9 +211,9 @@ EOF
     chmod -R 777 ./data/ 2>/dev/null || true
     
     print_status "Setting up Loki directories..."
-    # Ensure Loki has all required directories
-    sudo mkdir -p ./data/loki/chunks ./data/loki/rules ./data/loki/tsdb-index ./data/loki/tsdb-cache ./data/loki/boltdb-shipper-compactor 2>/dev/null || true
-    sudo chmod -R 777 ./data/loki/ 2>/dev/null || true
+    # Ensure Loki has all required directories (without sudo to avoid hanging)
+    mkdir -p ./data/loki/chunks ./data/loki/rules ./data/loki/tsdb-index ./data/loki/tsdb-cache ./data/loki/boltdb-shipper-compactor 2>/dev/null || true
+    chmod -R 777 ./data/loki/ 2>/dev/null || true
     
     # Build and start services
     print_status "Building and starting all services..."
@@ -226,7 +231,7 @@ EOF
     
     # Wait for core services
     wait_for_service "OpenTelemetry Collector" "http://localhost:13133"
-    wait_for_service "Prometheus" "http://localhost:9091"
+    wait_for_service "Prometheus" "http://localhost:9090"
     wait_for_service "Loki" "http://localhost:3100/ready"
     wait_for_service "Tempo" "http://localhost:3200/ready"
     wait_for_service "Grafana" "http://localhost:3000/api/health"

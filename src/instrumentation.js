@@ -1,13 +1,9 @@
 import { NodeSDK } from "@opentelemetry/sdk-node";
 import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
-import resourcesPkg from "@opentelemetry/resources";
-const { Resource } = resourcesPkg;
-import semanticConventionsPkg from "@opentelemetry/semantic-conventions";
-const { SemanticResourceAttributes } = semanticConventionsPkg;
+import semanticConventions from "@opentelemetry/semantic-conventions";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
 import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
-import { PrometheusExporter } from "@opentelemetry/exporter-prometheus";
 import { PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
 import {
   LoggerProvider,
@@ -35,10 +31,10 @@ const initTelemetry = () => {
   // Create resource with service information
   const resource = Resource.default().merge(
     new Resource({
-      [SemanticResourceAttributes.SERVICE_NAME]: serviceName,
-      [SemanticResourceAttributes.SERVICE_VERSION]: serviceVersion,
-      [SemanticResourceAttributes.SERVICE_NAMESPACE]: serviceNamespace,
-      [SemanticResourceAttributes.DEPLOYMENT_ENVIRONMENT]:
+      [semanticConventions.ATTR_SERVICE_NAME]: serviceName,
+      [semanticConventions.ATTR_SERVICE_VERSION]: serviceVersion,
+      [semanticConventions.ATTR_SERVICE_NAMESPACE]: serviceNamespace,
+      [semanticConventions.ATTR_DEPLOYMENT_ENVIRONMENT]:
         process.env.NODE_ENV || "development",
     })
   );
@@ -54,17 +50,6 @@ const initTelemetry = () => {
     url: metricsEndpoint,
     headers: {},
   });
-
-  // Prometheus exporter for metrics scraping
-  const prometheusExporter = new PrometheusExporter(
-    {
-      port: 9090,
-      endpoint: "/metrics",
-    },
-    () => {
-      console.log("📊 Prometheus metrics server started on port 9090");
-    }
-  );
 
   // Configure log exporter
   const logExporter = new OTLPLogExporter({
@@ -124,6 +109,7 @@ const initTelemetry = () => {
       console.log(`📊 Service: ${serviceName} (${serviceVersion})`);
       console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
       console.log(`📡 OTLP Endpoint: ${otelCollectorUrl}`);
+      console.log(`📈 Metrics will be available via OpenTelemetry Collector`);
     })
     .catch((error) => {
       console.error("❌ Error initializing OpenTelemetry:", error);
