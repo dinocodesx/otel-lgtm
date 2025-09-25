@@ -23,7 +23,7 @@ This TODO outlines the implementation of OpenTelemetry instrumentation for a Gor
 
 ### 1.1 Update Go Module Dependencies
 
-- [ ] Add OpenTelemetry core dependencies to `go.mod`:
+- [x] Add OpenTelemetry core dependencies to `go.mod`:
 
   ```bash
   go get go.opentelemetry.io/otel
@@ -34,7 +34,7 @@ This TODO outlines the implementation of OpenTelemetry instrumentation for a Gor
   go get go.opentelemetry.io/otel/propagation
   ```
 
-- [ ] Add OpenTelemetry instrumentation libraries:
+- [x] Add OpenTelemetry instrumentation libraries:
 
   ```bash
   go get go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux
@@ -42,7 +42,7 @@ This TODO outlines the implementation of OpenTelemetry instrumentation for a Gor
   go get go.opentelemetry.io/contrib/bridges/otelslog
   ```
 
-- [ ] Add OpenTelemetry exporters for LGTM stack:
+- [x] Add OpenTelemetry exporters for LGTM stack:
   ```bash
   go get go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp
   go get go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp
@@ -52,20 +52,20 @@ This TODO outlines the implementation of OpenTelemetry instrumentation for a Gor
 
 ### 1.2 Create Docker Infrastructure
 
-- [ ] Create `docker-compose.yml` with LGTM stack components:
+- [x] Create `docker-compose.yml` with LGTM stack components:
 
-  - [ ] Grafana (port 3000)
-  - [ ] Prometheus (port 9090)
-  - [ ] Loki (port 3100)
-  - [ ] Tempo (port 3200, 4317 for OTLP)
-  - [ ] OpenTelemetry Collector (port 4317, 4318)
+  - [x] Grafana (port 3000)
+  - [x] Prometheus (port 9090)
+  - [x] Loki (port 3100)
+  - [x] Tempo (port 3200, 4317 for OTLP)
+  - [x] OpenTelemetry Collector (port 4317, 4318)
 
-- [ ] Create configuration files:
-  - [ ] `config/prometheus.yml` - Prometheus scraping configuration
-  - [ ] `config/loki.yml` - Loki configuration
-  - [ ] `config/tempo.yml` - Tempo configuration
-  - [ ] `config/grafana/datasources.yml` - Grafana data sources
-  - [ ] `config/otel-collector.yml` - OTEL Collector configuration
+- [x] Create configuration files:
+  - [x] `config/prometheus.yml` - Prometheus scraping configuration
+  - [x] `config/loki.yml` - Loki configuration
+  - [x] `config/tempo.yml` - Tempo configuration
+  - [x] `config/grafana/datasources.yml` - Grafana data sources
+  - [x] `config/otel-collector.yml` - OTEL Collector configuration
 
 ---
 
@@ -73,12 +73,12 @@ This TODO outlines the implementation of OpenTelemetry instrumentation for a Gor
 
 ### 2.1 Create OpenTelemetry Setup Module
 
-- [ ] Create `internal/telemetry/otel.go` with:
-  - [ ] Resource configuration (service name, version, environment)
-  - [ ] Trace provider setup with OTLP HTTP exporter to Tempo
-  - [ ] Metrics provider setup with Prometheus and OTLP exporters
-  - [ ] Logging provider setup with OTLP HTTP exporter to Loki
-  - [ ] Graceful shutdown handling
+- [x] Create `app/otel.go` with:
+  - [x] Resource configuration (service name, version, environment)
+  - [x] Trace provider setup with OTLP HTTP exporter to Tempo
+  - [x] Metrics provider setup with Prometheus and OTLP exporters
+  - [x] Logging provider setup with OTLP HTTP exporter to Loki
+  - [x] Graceful shutdown handling
 
 ### 2.2 Configure Exporters
 
