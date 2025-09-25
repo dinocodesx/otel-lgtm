@@ -11,7 +11,8 @@ services:
     ports:
       - "4317:4317"   # OTLP gRPC receiver
       - "4318:4318"   # OTLP HTTP receiver
-      - "8888:8888"   # Prometheus metrics
+      - "8888:8888"   # Internal metrics for monitoring collector itself
+      - "8889:8889"   # Prometheus metrics export endpoint
     depends_on:
       - tempo
       - loki
@@ -83,8 +84,6 @@ services:
     container_name: tempo
     ports:
       - "3200:3200"   # Tempo HTTP
-      - "4317:4317"   # OTLP gRPC (shared with collector, will be handled by routing)
-      - "4318:4318"   # OTLP HTTP (shared with collector, will be handled by routing)
     command:
       - '-config.file=/etc/tempo.yaml'
     volumes:
