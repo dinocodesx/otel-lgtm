@@ -14,13 +14,13 @@ COPY app/go.mod app/go.sum ./
 RUN go mod download
 
 # Copy source code
-COPY app/main.go ./
+COPY app/*.go ./
 
 # Build the binary with optimizations for size
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
     -a -installsuffix cgo \
     -ldflags='-w -s -extldflags "-static"' \
-    -o server main.go
+    -o server .
 
 # Final stage - minimal runtime image
 FROM scratch
