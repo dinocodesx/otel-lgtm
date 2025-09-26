@@ -1,0 +1,116 @@
+services:
+  # Your Go Application
+  app:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - OTEL_SERVICE_NAME=otel-lgtm-api
+      - OTEL_SERVICE_VERSION=1.0.0
+      - ENVIRONMENT=development
+      - USER=appuser
+    networks:
+      - otel-lgtm
+    depends_on:
+      - otel-collector
+    restart: unless-stopped
+
+  # OpenTelemetry Collector
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.104.0
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./config/otelcol-config.yaml:/etc/otel-collector-config.yaml
+    ports:
+      - "4317:4317"   # OTLP gRPC receiver
+      - "4318:4318"   # OTLP HTTP receiver
+      - "8888:8888"   # Prometheus metrics
+    networks:
+      - otel-lgtm
+    depends_on:
+      - tempo
+      - loki
+      - prometheus
+    restart: unless-stopped
+
+  # Tempo - Distributed Tracing
+  tempo:
+    image: grafana/tempo:2.5.0
+    command: [ "-config.file=/etc/tempo.yaml" ]
+    volumes:
+      - ./config/tempo.yaml:/etc/tempo.yaml
+      - tempo_data:/tmp/tempo
+    ports:
+      - "3200:3200"   # Tempo HTTP
+      - "9411:9411"   # Jaeger HTTP
+    networks:
+      - otel-lgtm
+    restart: unless-stopped
+
+  # Loki - Log Aggregation
+  loki:
+    image: grafana/loki:3.1.0
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./config/loki.yaml:/etc/loki/local-config.yaml
+      - loki_data:/tmp/loki
+    ports:
+      - "3100:3100"
+    networks:
+      - otel-lgtm
+    restart: unless-stopped
+
+  # Prometheus - Metrics Storage
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=15d'
+      - '--storage.tsdb.retention.size=1GB'
+      - '--web.enable-lifecycle'
+      - '--web.enable-remote-write-receiver'
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - otel-lgtm
+    restart: unless-stopped
+
+  # Grafana - Unified Observability Dashboard  
+  grafana:
+    image: grafana/grafana:11.1.0
+    volumes:
+      - ./config/grafana.ini:/etc/grafana/grafana.ini
+      - ./config/grafana/provisioning:/etc/grafana/provisioning
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    networks:
+      - otel-lgtm
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    depends_on:
+      - prometheus
+      - tempo
+      - loki
+    restart: unless-stopped
+
+networks:
+  otel-lgtm:
+    driver: bridge
+
+volumes:
+  prometheus_data:
+  grafana_data:
+  tempo_data:
+  loki_data:

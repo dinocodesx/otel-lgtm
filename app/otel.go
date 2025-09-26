@@ -54,10 +54,10 @@ func DefaultConfig() *Config {
 		ServiceName:     getServiceName(),
 		ServiceVersion:  getServiceVersion(),
 		Environment:     getEnvironment(),
-		TraceEndpoint:   "http://localhost:4318/v1/traces",  // Tempo via OTEL Collector
-		MetricsEndpoint: "http://localhost:4318/v1/metrics", // Prometheus via OTEL Collector
-		LogsEndpoint:    "http://localhost:4318/v1/logs",    // Loki via OTEL Collector
-		SampleRate:      1.0,                                // 100% sampling for development
+		TraceEndpoint:   "http://otel-collector:4318", // OTLP HTTP endpoint
+		MetricsEndpoint: "http://otel-collector:4318", // OTLP HTTP endpoint
+		LogsEndpoint:    "http://otel-collector:4318", // OTLP HTTP endpoint
+		SampleRate:      1.0,                          // 100% sampling for development
 	}
 }
 
