@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"log/slog"
 	"math/rand"
 	"net/http"
 	"os"
@@ -14,23 +13,6 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"go.opentelemetry.io/contrib/bridges/otelslog"
-	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/metric"
-)
-
-const serviceName = "otel-lgtm-api"
-
-// Application-level telemetry objects (initialized from providers)
-var (
-	meter  metric.Meter
-	logger *slog.Logger
-
-	// Custom business metrics (not HTTP metrics - those are handled by otelmux)
-	apiRequestDuration metric.Float64Histogram
-	scenarioCounter    metric.Int64Counter
 )
 
 // Response structures
@@ -80,36 +62,7 @@ type Scenario struct {
 
 var startTime = time.Now()
 
-// initApplicationTelemetry initializes application-specific telemetry objects
-// HTTP instrumentation is handled by otelmux middleware
-func initApplicationTelemetry() error {
-	// Get meter from global provider (set up by otel.go)
-	meter = otel.Meter(serviceName)
-
-	// Create structured logger with OpenTelemetry bridge
-	logger = otelslog.NewLogger(serviceName)
-
-	// Create custom business metrics (not HTTP metrics - those are handled by otelmux)
-	var err error
-	apiRequestDuration, err = meter.Float64Histogram(
-		"app.api.request.duration",
-		metric.WithDescription("Duration of API business logic processing"),
-		metric.WithUnit("s"),
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create API request duration histogram: %w", err)
-	}
-
-	scenarioCounter, err = meter.Int64Counter(
-		"app.api.scenario.count",
-		metric.WithDescription("Count of API response scenarios"),
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create scenario counter: %w", err)
-	}
-
-	return nil
-} // Generate random request ID
+// Generate random request ID
 func generateRequestID() string {
 	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
 	b := make([]byte, 13)
@@ -119,10 +72,9 @@ func generateRequestID() string {
 	return string(b)
 }
 
-// Root route handler - simplified without manual instrumentation
+// Root route handler - simplified
 func rootHandler(w http.ResponseWriter, r *http.Request) {
-	// otelmux already handles HTTP span creation and attributes
-	logger.InfoContext(r.Context(), "Root endpoint accessed")
+	log.Printf("Root endpoint accessed")
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -134,14 +86,11 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-// Health check handler - simplified without manual instrumentation
+// Health check handler - simplified
 func healthHandler(w http.ResponseWriter, r *http.Request) {
-	// otelmux already handles HTTP span creation and attributes
 	uptime := time.Since(startTime).Seconds()
 
-	logger.InfoContext(r.Context(), "Health check accessed",
-		slog.Float64("uptime_seconds", uptime),
-	)
+	log.Printf("Health check accessed, uptime: %.2f seconds", uptime)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -328,7 +277,7 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 	requestID := generateRequestID()
 	timestamp := time.Now().Format(time.RFC3339)
 
-	// Record business metrics
+	// Record business timing
 	duration := time.Since(start)
 	scenarioType := func() string {
 		switch {
@@ -343,32 +292,17 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	// Custom business metrics (HTTP metrics handled by otelmux)
-	apiRequestDuration.Record(r.Context(), duration.Seconds(),
-		metric.WithAttributes(attribute.String("scenario_type", scenarioType)))
+	// Simple logging with business context
+	logMessage := fmt.Sprintf("API request completed - Status: %d, Type: %s, Delay: %dms, Duration: %s, RequestID: %s",
+		randomScenario.Status, scenarioType, delay, duration.String(), requestID)
 
-	scenarioCounter.Add(r.Context(), 1,
-		metric.WithAttributes(
-			attribute.String("scenario_type", scenarioType),
-			attribute.Int("status_code", randomScenario.Status)))
-
-	// Structured logging with business context
-	var logLevel slog.Level
 	if randomScenario.Status >= 500 {
-		logLevel = slog.LevelError
+		log.Printf("ERROR: %s", logMessage)
 	} else if randomScenario.Status >= 400 {
-		logLevel = slog.LevelWarn
+		log.Printf("WARN: %s", logMessage)
 	} else {
-		logLevel = slog.LevelInfo
+		log.Printf("INFO: %s", logMessage)
 	}
-
-	logger.LogAttrs(r.Context(), logLevel, "API business logic completed",
-		slog.Int("status_code", randomScenario.Status),
-		slog.Int("delay_ms", delay),
-		slog.String("scenario_type", scenarioType),
-		slog.String("request_id", requestID),
-		slog.Duration("duration", duration),
-	)
 
 	// Build and send response
 	w.Header().Set("Content-Type", "application/json")
@@ -406,13 +340,9 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// 404 handler - simplified without manual instrumentation
+// 404 handler - simplified
 func notFoundHandler(w http.ResponseWriter, r *http.Request) {
-	// otelmux already handles HTTP span creation and attributes
-	logger.LogAttrs(r.Context(), slog.LevelWarn, "Route not found",
-		slog.String("path", r.URL.Path),
-		slog.String("method", r.Method),
-	)
+	log.Printf("WARN: Route not found - Path: %s, Method: %s", r.URL.Path, r.Method)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusNotFound)
@@ -427,35 +357,14 @@ func notFoundHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	ctx := context.Background()
-
-	// Initialize OpenTelemetry providers using otel.go
-	tp, err := SetupWithConfig(ctx, serviceName, "1.0.0", "development")
-	if err != nil {
-		log.Fatalf("Failed to initialize telemetry: %v", err)
-	}
-	defer func() {
-		if err := tp.Shutdown(ctx); err != nil {
-			log.Printf("Error shutting down telemetry: %v", err)
-		}
-	}()
-
-	// Initialize application-specific telemetry
-	if err := initApplicationTelemetry(); err != nil {
-		log.Fatalf("Failed to initialize application telemetry: %v", err)
-	}
-
 	// Get port from environment or default to 8080
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
 
-	// Create router with OpenTelemetry instrumentation
+	// Create router
 	r := mux.NewRouter()
-
-	// Add otelmux middleware (handles all HTTP instrumentation automatically)
-	r.Use(otelmux.Middleware(serviceName))
 
 	// Define routes
 	r.HandleFunc("/", rootHandler).Methods("GET")
@@ -470,7 +379,6 @@ func main() {
 	fmt.Printf("📍 Root endpoint: http://localhost:%s/\n", port)
 	fmt.Printf("🎲 API endpoint: http://localhost:%s/api\n", port)
 	fmt.Printf("❤️  Health check: http://localhost:%s/health\n", port)
-	fmt.Printf("📊 OpenTelemetry instrumentation enabled - sending data to OTEL collector\n")
 
 	// Graceful shutdown
 	server := &http.Server{
